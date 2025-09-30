@@ -154,7 +154,6 @@ uint8_t initradio(void)
 void setup() 
 {
   
- 
   LCD_DDR |= (1<<LCD_RSDS_PIN);
   LCD_DDR |= (1<<LCD_ENABLE_PIN);
   LCD_DDR |= (1<<LCD_CLOCK_PIN);
@@ -165,28 +164,10 @@ void setup()
   delay(1000);
   lcd_clr_line(0);
   
-  DDRB |= (1<<PB1); // 
-  DDRB |= (1<<PB2);
-  
-  
-  DDRC |= (1<<PC2);
-  DDRC |= (1<<PC3);
-  DDRC |= (1<<PC0);
-  DDRC |= (1<<PC1);
-
-
   DDRB |= (1<<PB0); // LED
- 
   DDRC &= ~(1<<PC4); // Batt
-
   DDRC |= (1<<PC5); // Buzzer
- //Serial.begin(9600);
-  //pinMode(LOOPLED,OUTPUT);
-  //pinMode(2,INPUT); // IRQ
-  //pinMode(A0,OUTPUT); // CE
-  //pinMode(A1,OUTPUT); // CSN
 
-  
   // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
   ch1.attach(A0); // YAW
   ch2.attach(S1); // PITCH
@@ -203,16 +184,8 @@ void setup()
     lcd_gotoxy(19,0);
     lcd_puts("+");
   }
-  
- //DDRB &= ~(1<<4);
-  
-  
-  //ResetData();
-  
-  
 }
 
-volatile uint8_t yawraw = 0;
 
 unsigned long lastRecvTime = 0;
 
@@ -231,7 +204,6 @@ void loop()
 {
   loopcounter++;
  
-  
   if(loopcounter >= BLINKRATE)
   {
     
