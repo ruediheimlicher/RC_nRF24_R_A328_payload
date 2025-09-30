@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"name": "RC_nRF24_R_A328_smd",
+			"path": "../../RC_nRF_MAG/RC_nRF24_Receiver/Receiver/RC_nRF24_R_A328_smd"
+		}
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
+}
