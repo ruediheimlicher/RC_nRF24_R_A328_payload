@@ -104,6 +104,7 @@ const uint64_t pipeIn = 0xABCDABCD71LL;
   // instantiate an object for the nRF24L01 transceiver
 RF24 radio(CE_PIN, CSN_PIN);
 
+int ackData[4] = {21,22,23,24};
 
 void ResetData()
 {
@@ -121,10 +122,11 @@ uint8_t initradio(void)
 {
     ResetData();                   // Configure the NRF24 module  | NRF24 Modül konfigürasyonu
   radio.begin();
+  radio.enableAckPayload();
   radio.openReadingPipe(1,pipeIn);
   //radio.setChannel(100);
   radio.setChannel(124);
-  radio.setAutoAck(false);
+  //radio.setAutoAck(false);
   //radio.setDataRate(RF24_250KBPS);    // The lowest data rate value for more stable communication  | Daha kararlı iletişim için en düşük veri hızı.
   radio.setDataRate(RF24_2MBPS); // Set the speed of the transmission to the quickest available
   radio.setPALevel(RF24_PA_MAX);                           // Output power is set for maximum |  Çıkış gücü maksimum için ayarlanıyor.
@@ -132,7 +134,7 @@ uint8_t initradio(void)
   radio.setPALevel(RF24_PA_MAX); 
   
   radio.startListening(); 
-     if (radio.failureDetected) 
+  if (radio.failureDetected) 
   {
     radio.failureDetected = false;
     delay(250);
@@ -197,9 +199,15 @@ void recvData()
   if ( radio.available() ) 
   {
     radiocounter++;
-    radio.read(&data, sizeof(Signal));
+    //int done = false;
+    //while (!done)
+    {
+      radio.read(&data, sizeof(data));
+    }
+    
     //yawraw = data.yaw-1;
     lastRecvTime = millis();   // Receive the data | Data alınıyor
+    radio.writeAckPayload( 1, &ackData, sizeof(ackData) );
   }
 }
 
@@ -218,7 +226,12 @@ void loop()
     //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
     //digitalWrite(A0, ! digitalRead(A0))
     //Serial.println(data.yaw);
-   
+    lcd_gotoxy(10,0);
+    lcd_putint12(radiocounter);
+    lcd_gotoxy(0,1);
+    lcd_putint(data.yaw);
+    lcd_putc(' ');
+    lcd_putint12(ch_width_1);
    /*
     lcd_gotoxy(0,0);
     lcd_putint(impulscounter);
