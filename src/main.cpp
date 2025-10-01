@@ -29,6 +29,9 @@ uint16_t radiocounter = 1;
 
 uint8_t radiostatus = 0;
 
+// ack
+bool newData = false;
+
 #define FIRSTTIMEDELAY  0x0FF
 #define RADIOSTARTED    1
 #define RADIORUNNING    2
@@ -291,8 +294,7 @@ void loop()
 
   if( radiostatus & (1<<RADIOSTARTED))
   {
-
-    
+ 
     recvData();
     unsigned long now = millis();
     if ( now - lastRecvTime > 1000 ) 
