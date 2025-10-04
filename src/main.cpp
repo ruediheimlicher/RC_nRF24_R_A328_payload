@@ -7,7 +7,7 @@
 #include "lcd.h"
 #include "expo.h"
 
-
+#define TEST    0
 /*
 RC_nRF_Receiver A328 payload
 
@@ -30,7 +30,15 @@ uint16_t radiocounter = 1;
 uint8_t radiostatus = 0;
 
 // ack
+
+// ********************
+// ACK Payload ********
 bool newData = false;
+uint8_t ackData[2] = {11,12};
+// ********************
+// ********************
+
+
 
 #define FIRSTTIMEDELAY  0x0FF
 #define RADIOSTARTED    1
@@ -124,13 +132,25 @@ uint8_t initradio(void)
   radio.openReadingPipe(1,pipeIn);
   //radio.setChannel(100);
   radio.setChannel(124);
-  radio.setAutoAck(false);
+
+  // ********************
+  // ACK Payload ********
+  //radio.setAutoAck(false);
+  // ********************
+  // ********************
+
   //radio.setDataRate(RF24_250KBPS);    // The lowest data rate value for more stable communication  | Daha kararlı iletişim için en düşük veri hızı.
   radio.setDataRate(RF24_2MBPS); // Set the speed of the transmission to the quickest available
   radio.setPALevel(RF24_PA_MAX);                           // Output power is set for maximum |  Çıkış gücü maksimum için ayarlanıyor.
   radio.setPALevel(RF24_PA_MIN); 
   radio.setPALevel(RF24_PA_MAX); 
   
+
+  // ********************
+  // ACK Payload ********
+  radio.enableDynamicPayloads();
+  radio.enableAckPayload();
+  // ********************
   radio.startListening(); 
      if (radio.failureDetected) 
   {
@@ -153,7 +173,6 @@ uint8_t initradio(void)
  
 }
 
-
 void setup() 
 {
   
@@ -172,7 +191,7 @@ void setup()
   DDRC |= (1<<PC5); // Buzzer
 
   // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
-  ch1.attach(A0); // YAW
+  ch1.attach(S0); // YAW
   ch2.attach(S1); // PITCH
   ch3.attach(S2); // ROLL
   ch4.attach(S3); // THROTTLE
@@ -188,8 +207,6 @@ void setup()
     lcd_puts("+");
   }
 }
-
-
 unsigned long lastRecvTime = 0;
 
 void recvData()
@@ -198,8 +215,13 @@ void recvData()
   {
     radiocounter++;
     radio.read(&data, sizeof(Signal));
-    //yawraw = data.yaw-1;
     lastRecvTime = millis();   // Receive the data | Data alınıyor
+
+    // ********************
+    // ACK Payload ********
+    radio.writeAckPayload(1, &ackData, sizeof(ackData));
+    // ********************
+    // ********************
   }
 }
 
@@ -218,63 +240,68 @@ void loop()
     //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
     //digitalWrite(A0, ! digitalRead(A0))
     //Serial.println(data.yaw);
-   
-   /*
-    lcd_gotoxy(0,0);
-    lcd_putint(impulscounter);
-    lcd_gotoxy(4,0);
-    lcd_putint12(resetcounter);
-    lcd_gotoxy(10,0);
-    lcd_putint12(radiocounter);
-    
+    if(TEST)
+    {
+      /*
+      lcd_gotoxy(0,0);
+      lcd_putint(impulscounter);
+      */
+      lcd_gotoxy(4,0);
+      lcd_putint12(resetcounter);
+      
+      lcd_gotoxy(10,0);
+      lcd_putint12(radiocounter);
+      
+      
+
+      lcd_gotoxy(0,1);
+      lcd_putint(data.yaw);
+      lcd_putc(' ');
+      lcd_putint12(ch_width_1);
+      lcd_putc(' ');
+      lcd_putint(data.pitch);
+      lcd_putc(' ');
+      lcd_putint12(ch_width_2);
+  
+      /*
+      lcd_putint(data.roll);
+      lcd_putc(' ');
+      lcd_putint(data.throttle);
+      */
+      //lcd_gotoxy(16,1);
+      //lcd_putint(yawraw);
+
+      //lcd_putc(' ');
+      //lcd_gotoxy(10,2);
+      //lcd_putint(ch_width_2);
+      //lcd_putc(' ');
+      //lcd_putint(data.pitch);
+      //lcd_putc(' ');
+      
+      /*
+      lcd_putint(ch_width_3);
+      lcd_putc(' ');
+      lcd_gotoxy(0,3);
+      lcd_putint(ch_width_4);
+      lcd_putc(' ');
+      lcd_putint(ch_width_5);
+      lcd_putc(' ');
+      lcd_putint(ch_width_6);
+      */
     
 
-    lcd_gotoxy(0,1);
-    lcd_putint(data.yaw);
-    lcd_putc(' ');
-    lcd_putint12(ch_width_1);
-    lcd_putc(' ');
-    lcd_putint(data.pitch);
-    lcd_putc(' ');
-    lcd_putint12(ch_width_2);
-*/  
-    /*
-    lcd_putint(data.roll);
-    lcd_putc(' ');
-    lcd_putint(data.throttle);
-    */
-    //lcd_gotoxy(16,1);
-    //lcd_putint(yawraw);
-
-    //lcd_putc(' ');
-    //lcd_gotoxy(10,2);
-    //lcd_putint(ch_width_2);
-    //lcd_putc(' ');
-    //lcd_putint(data.pitch);
-    //lcd_putc(' ');
-    
-    /*
-    lcd_putint(ch_width_3);
-    lcd_putc(' ');
-    lcd_gotoxy(0,3);
-    lcd_putint(ch_width_4);
-    lcd_putc(' ');
-    lcd_putint(ch_width_5);
-     lcd_putc(' ');
-    lcd_putint(ch_width_6);
-    */
-   if( radiostatus & (1<<RADIOSTARTED))
-   {
-    //recvData();
-    lcd_gotoxy(16,3);
-    lcd_puts("strt");
-   }
-   else
-   {
-    lcd_gotoxy(16,3);
-    lcd_puts("xxxx");
-   }
-
+      if( radiostatus & (1<<RADIOSTARTED))
+      {
+        recvData();
+        lcd_gotoxy(16,3);
+        lcd_puts("strt");
+      }
+      else
+      {
+        lcd_gotoxy(16,3);
+        lcd_puts("xxxx");
+      }
+    } // if TEST
   }
   
   /*
@@ -294,7 +321,10 @@ void loop()
 
   if( radiostatus & (1<<RADIOSTARTED))
   {
- 
+
+    ackData[0] = data.yaw;
+    ackData[1] = data.pitch;
+    
     recvData();
     unsigned long now = millis();
     if ( now - lastRecvTime > 1000 ) 
@@ -327,7 +357,5 @@ void loop()
   ch4.writeMicroseconds(ch_width_4);
   ch5.writeMicroseconds(ch_width_5);
   //ch6.writeMicroseconds(ch_width_6); 
-
-
 }
 
