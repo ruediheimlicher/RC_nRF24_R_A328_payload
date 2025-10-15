@@ -6,6 +6,13 @@
 		{
 			"name": "RC_nRF24_R_A328_smd",
 			"path": "../../RC_nRF_MAG/RC_nRF24_Receiver/Receiver/RC_nRF24_R_A328_smd"
+		},
+		{
+			"path": "../../RC_nRF_T_every_payload"
+		},
+		{
+			"name": "RC_nRF_FS_Teensy",
+			"path": "../../RC_nRF_FS_Teensy"
 		}
 	],
 	"settings": {

@@ -7,7 +7,7 @@
 #include "lcd.h"
 #include "expo.h"
 
-#define TEST    0
+#define TEST    1
 /*
 RC_nRF_Receiver A328 payload
 
@@ -18,6 +18,8 @@ PCB: RC_nRF24_A8_1
 //#define LOOPLED A3 // PC3
 
 #define LOOPLED PB0
+
+#define BATT_PIN   PC3
 
 #define BLINKRATE 0x02FF
 
@@ -34,7 +36,7 @@ uint8_t radiostatus = 0;
 // ********************
 // ACK Payload ********
 bool newData = false;
-uint8_t ackData[2] = {11,12};
+uint8_t ackData[4] = {31,32,33,34};
 // ********************
 // ********************
 
@@ -94,18 +96,56 @@ Signal data;
 
 
 // RC_NRF_REC_1
-#define S0  A0     // PD0 // YAW
-#define S1  A1    // PD1 // PITCH
-#define S2  A2     // PD2 // ROLL
-#define S3  A3     // PD3 // THROTTLE
+#define S0  A0      // YAW
+#define S1  A1      //PITCH
+#define S2  A2      // ROLL
+#define S3  PD0     // THROTTLE
 
-#define IO0 PD4     // PD4 // AUX
-#define IO1 A0    // PD1
+#define IO0 PD3     // AUX
+#define IO1 PD2    // AUX2
 
 #define CE_PIN 10   // PB2
 #define CSN_PIN 9  // PB1
 
+void initADC()
+{
+   ADCSRA = (1<<ADEN) | (1<<ADPS2) | (1<<ADPS0);    // Frequenzvorteiler auf 32 setzen und ADC aktivieren 
+ 
+  //ADMUX = derKanal;                      // übergebenen Kanal waehlen
 
+  ADMUX |= (1<<REFS1) | (1<<REFS0); // interne Referenzspannung nutzen 
+  //ADMUX |= (1<<REFS0); // VCC als Referenzspannung nutzen 
+ 
+  /* nach Aktivieren des ADC wird ein "Dummy-Readout" empfohlen, man liest
+     also einen Wert und verwirft diesen, um den ADC "warmlaufen zu lassen" */
+  ADCSRA |= (1<<ADSC);              // eine ADC-Wandlung (Der ADC setzt dieses Bit ja wieder auf 0 nach dem Wandeln)
+  while ( ADCSRA & (1<<ADSC) ) {
+     ;     // auf Abschluss der Wandlung warten 
+  }
+}
+uint16_t readKanal(uint8_t derKanal) //Unsere Funktion zum ADC-Channel aus lesen
+{
+  uint8_t i;
+  uint16_t result = 0;         //Initialisieren wichtig, da lokale Variablen
+                               //nicht automatisch initialisiert werden und
+                               //zufällige Werte haben. Sonst kann Quatsch rauskommen
+   ADMUX &= 0XF0;         //clearing channels
+   ADMUX |= derKanal; 
+  // Eigentliche Messung - Mittelwert aus 4 aufeinanderfolgenden Wandlungen
+  for(i=0;i<4;i++)
+  {
+    ADCSRA |= (1<<ADSC);            // eine Wandlung
+    while ( ADCSRA & (1<<ADSC) ) {
+      ;     // auf Abschluss der Wandlung warten 
+    }
+    result += ADCW;            // Wandlungsergebnisse aufaddieren
+  }
+//  ADCSRA &= ~(1<<ADEN);             // ADC deaktivieren ("Enable-Bit" auf LOW setzen)
+ 
+  result /= 4;                     // Summe durch vier teilen = arithm. Mittelwert
+ 
+  return result;
+}
 
 const uint64_t pipeIn = 0xABCDABCD71LL;
 
@@ -151,6 +191,7 @@ uint8_t initradio(void)
   radio.enableDynamicPayloads();
   radio.enableAckPayload();
   // ********************
+   
   radio.startListening(); 
      if (radio.failureDetected) 
   {
@@ -187,7 +228,7 @@ void setup()
   lcd_clr_line(0);
   
   DDRB |= (1<<PB0); // LED
-  DDRC &= ~(1<<PC4); // Batt
+  DDRC &= ~(1<<PC3); // Batt
   DDRC |= (1<<PC5); // Buzzer
 
   // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
@@ -195,7 +236,7 @@ void setup()
   ch2.attach(S1); // PITCH
   ch3.attach(S2); // ROLL
   ch4.attach(S3); // THROTTLE
-  ch5.attach(IO0);
+  //ch5.attach(IO0);
   //ch6.attach(IO1);
                                                        
   ResetData();                                            
@@ -206,6 +247,7 @@ void setup()
     lcd_gotoxy(19,0);
     lcd_puts("+");
   }
+  initADC();
 }
 unsigned long lastRecvTime = 0;
 
@@ -231,7 +273,7 @@ void loop()
  
   if(loopcounter >= BLINKRATE)
   {
-    
+    ackData[3] = readKanal(BATT_PIN) >> 2;
     PORTB ^= (1<<0);
     
     loopcounter = 0;
@@ -252,7 +294,8 @@ void loop()
       lcd_gotoxy(10,0);
       lcd_putint12(radiocounter);
       
-      
+      lcd_gotoxy(10,3);
+      lcd_putint12(ackData[3]);
 
       lcd_gotoxy(0,1);
       lcd_putint(data.yaw);
@@ -322,8 +365,11 @@ void loop()
   if( radiostatus & (1<<RADIOSTARTED))
   {
 
+     
     ackData[0] = data.yaw;
     ackData[1] = data.pitch;
+    ackData[2] = data.roll;
+    //ackData[3] = data.throttle; // neu ADC BATT
     
     recvData();
     unsigned long now = millis();
