@@ -15,6 +15,8 @@ PCB: RC_nRF24_A8_1
 
 */
 
+#include "MS5611.h"
+
 //#define LOOPLED A3 // PC3
 
 #define LOOPLED PB0
@@ -40,7 +42,8 @@ uint8_t ackData[4] = {31,32,33,34};
 // ********************
 // ********************
 
-
+uint16_t pressurearray[8] = {0};
+uint8_t pressurecounter = 0;
 
 #define FIRSTTIMEDELAY  0x0FF
 #define RADIOSTARTED    1
@@ -153,6 +156,8 @@ const uint64_t pipeIn = 0xABCDABCD71LL;
 RF24 radio(CE_PIN, CSN_PIN);
 
 
+MS5611 MS5611(0x77);
+
 void ResetData()
 {
 
@@ -248,6 +253,28 @@ void setup()
     lcd_puts("+");
   }
   initADC();
+
+  Wire.begin();
+  if (MS5611.begin() == true)
+  {
+    lcd_gotoxy(0,3);
+    lcd_puts("MS5611 found: ");
+    
+    lcd_putint12(MS5611.getAddress());
+  }
+  else
+  {
+    lcd_gotoxy(0,3);
+    lcd_puts("MS5611 not found: ");
+    //  while (1);
+  }
+  MS5611.setOversampling(OSR_HIGH);
+  //Serial.println();
+  //Serial.println("Celsius\tmBar\tMeter\tFeet");
+  _delay_ms(1000);
+  lcd_clr_line(3);
+  
+
 }
 unsigned long lastRecvTime = 0;
 
@@ -273,6 +300,38 @@ void loop()
  
   if(loopcounter >= BLINKRATE)
   {
+    
+    MS5611.read();    
+    float temperatur = MS5611.getTemperature();
+
+    float pressure = MS5611.getPressure();
+    
+    pressurearray[(pressurecounter % 8)] = uint16_t(100*pressure);
+    pressurecounter++;
+
+    uint32_t pressuremittel = 0;
+    for (uint8_t i=0;i<8;i++)
+    {
+      pressuremittel += pressurearray[i];
+    }
+    pressuremittel /= 8 ;
+
+    float altitude = MS5611.getAltitude();
+    altitude *= 100;
+
+    lcd_gotoxy(0,2);
+    lcd_putint12(temperatur);
+    lcd_putc(' ');
+    lcd_gotoxy(0,3);
+    //lcd_putint12(pressure);
+    //lcd_putc(' ');
+    lcd_putint16(pressuremittel);
+    lcd_putc(' ');
+    lcd_putint12(altitude);
+     lcd_putc(' ');
+
+
+
     ackData[3] = readKanal(BATT_PIN) >> 2;
     PORTB ^= (1<<0);
     
@@ -294,7 +353,7 @@ void loop()
       lcd_gotoxy(10,0);
       lcd_putint12(radiocounter);
       
-      lcd_gotoxy(10,3);
+      lcd_gotoxy(10,2);
       lcd_putint12(ackData[3]);
 
       lcd_gotoxy(0,1);
