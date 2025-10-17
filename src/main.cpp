@@ -42,8 +42,10 @@ uint8_t ackData[4] = {31,32,33,34};
 // ********************
 // ********************
 
-uint16_t pressurearray[8] = {0};
+uint16_t pressurearray[16] = {0};
+uint16_t altarray[16] = {0};
 uint8_t pressurecounter = 0;
+uint16_t pressuredelaycounter = 0;
 
 #define FIRSTTIMEDELAY  0x0FF
 #define RADIOSTARTED    1
@@ -219,6 +221,51 @@ uint8_t initradio(void)
  
 }
 
+float pressure = 0;
+uint16_t pressureint = 0;
+float temperatur = 0;
+double altitude = 0;
+uint32_t altitudeint = 0;
+uint32_t oldpressuremittel = 0;
+uint16_t aktpressure = 0;
+volatile uint16_t aktaltitude = 0;
+uint16_t startpressure = 0;
+uint16_t startaltitude = 0;
+const float seaLevelPressure = 1013.25; 
+
+uint16_t readSensor()
+{
+   MS5611.read();    
+    temperatur = MS5611.getTemperature();
+
+
+    pressure = MS5611.getPressure();
+    pressureint = (uint16_t)(pressure*100) ;
+    
+    pressurearray[(pressurecounter % 8)] = pressureint;
+
+    altitude = MS5611.getAltitude(seaLevelPressure);
+    ackData[2] = altitude;
+    altitudeint = (uint32_t)(altitude) ;
+ 
+    altarray[(pressurecounter % 8)] = altitudeint;
+    pressurecounter++;
+    //oldpressuremittel = pressuremittel;
+
+    uint32_t pressuremittel = 0;
+    uint32_t altmittel = 0;
+    for (uint8_t i=0;i<8;i++)
+    {
+      pressuremittel += pressurearray[i];
+      altmittel += altarray[i];
+    }
+    pressuremittel /= 8 ;
+    altmittel /= 8;
+    aktaltitude = altitudeint ;//& 0xFFFF;
+      
+    return pressuremittel & 0xFFFF;
+}
+
 void setup() 
 {
   
@@ -273,7 +320,14 @@ void setup()
   //Serial.println("Celsius\tmBar\tMeter\tFeet");
   _delay_ms(1000);
   lcd_clr_line(3);
-  
+  for (uint8_t i=0;i<16;i++)
+  {
+    startpressure = readSensor();
+  }
+  startaltitude = altitude;
+  lcd_gotoxy(0,2);
+  lcd_putint12(startpressure);
+  startpressure += 10;
 
 }
 unsigned long lastRecvTime = 0;
@@ -294,42 +348,64 @@ void recvData()
   }
 }
 
+
+
+
 void loop() 
 {
+
+  pressuredelaycounter++;
+  if(pressuredelaycounter > 0xFF)
+  {
+    pressuredelaycounter = 0;
+    aktpressure = readSensor();
+    /*
+    MS5611.read();    
+    temperatur = MS5611.getTemperature();
+
+    pressure = MS5611.getPressure();
+    pressureint = (uint16_t)((pressure + 40.0) / 160.0 * (float)0xFFFF) ;
+    
+    pressurearray[(pressurecounter % 16)] = pressureint;
+    pressurecounter++;
+    oldpressuremittel = pressuremittel;
+
+    pressuremittel = 0;
+    for (uint8_t i=0;i<16;i++)
+    {
+      pressuremittel += pressurearray[i];
+    }
+    pressuremittel /= 16 ;
+    
+    diff = 100 +(pressuremittel - oldpressuremittel);
+    altitude = MS5611.getAltitude();
+    altitude *= 100;
+  */
+  }
+
   loopcounter++;
  
   if(loopcounter >= BLINKRATE)
   {
     
-    MS5611.read();    
-    float temperatur = MS5611.getTemperature();
-
-    float pressure = MS5611.getPressure();
-    
-    pressurearray[(pressurecounter % 8)] = uint16_t(100*pressure);
-    pressurecounter++;
-
-    uint32_t pressuremittel = 0;
-    for (uint8_t i=0;i<8;i++)
-    {
-      pressuremittel += pressurearray[i];
-    }
-    pressuremittel /= 8 ;
-
-    float altitude = MS5611.getAltitude();
-    altitude *= 100;
-
-    lcd_gotoxy(0,2);
+    lcd_gotoxy(5,2);
     lcd_putint12(temperatur);
     lcd_putc(' ');
-    lcd_gotoxy(0,3);
-    //lcd_putint12(pressure);
-    //lcd_putc(' ');
-    lcd_putint16(pressuremittel);
-    lcd_putc(' ');
-    lcd_putint12(altitude);
-     lcd_putc(' ');
 
+    lcd_gotoxy(0,3);
+    lcd_putint16(pressureint);
+    lcd_putc(' ');
+    lcd_putint12(aktpressure);
+    lcd_putc(' ');
+    //uint16_t diff = startpressure - aktpressure ;
+    uint8_t diff = altitude - startaltitude +1;
+
+
+    lcd_putint12(diff);
+    //lcd_putc(' ');
+    lcd_gotoxy(10,2);
+    lcd_putint12(altitude);
+    // lcd_putc(' ');
 
 
     ackData[3] = readKanal(BATT_PIN) >> 2;
@@ -353,17 +429,19 @@ void loop()
       lcd_gotoxy(10,0);
       lcd_putint12(radiocounter);
       
-      lcd_gotoxy(10,2);
-      lcd_putint12(ackData[3]);
+      lcd_gotoxy(10,1);
+      lcd_putint12(ackData[2]);// alt
+      lcd_gotoxy(16,1);
+      lcd_putint12(ackData[3]); // Batt
 
       lcd_gotoxy(0,1);
       lcd_putint(data.yaw);
       lcd_putc(' ');
-      lcd_putint12(ch_width_1);
-      lcd_putc(' ');
+      //lcd_putint12(ch_width_1);
+      //lcd_putc(' ');
       lcd_putint(data.pitch);
-      lcd_putc(' ');
-      lcd_putint12(ch_width_2);
+      //lcd_putc(' ');
+      //lcd_putint12(ch_width_2);
   
       /*
       lcd_putint(data.roll);
@@ -395,8 +473,8 @@ void loop()
       if( radiostatus & (1<<RADIOSTARTED))
       {
         recvData();
-        lcd_gotoxy(16,3);
-        lcd_puts("strt");
+        //lcd_gotoxy(16,3);
+        //lcd_puts("strt");
       }
       else
       {
@@ -425,7 +503,7 @@ void loop()
   {
 
      
-    ackData[0] = data.yaw;
+    //ackData[0] = data.yaw;
     ackData[1] = data.pitch;
     ackData[2] = data.roll;
     //ackData[3] = data.throttle; // neu ADC BATT
