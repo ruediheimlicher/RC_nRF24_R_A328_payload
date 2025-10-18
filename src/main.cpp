@@ -8,6 +8,9 @@
 #include "expo.h"
 
 #define TEST    1
+#define R_SMD 0
+#define  R_DIL 1
+#define BOARD 1
 /*
 RC_nRF_Receiver A328 payload
 
@@ -55,10 +58,10 @@ uint16_t firsttimecounter = 0;
 
 int ch_width_1 = 127;
 int ch_width_2 = 127;
-int ch_width_3 = 0;
-int ch_width_4 = 0;
-int ch_width_5 = 0;
-int ch_width_6 = 0;
+int ch_width_3 = 127;
+int ch_width_4 = 127;
+int ch_width_5 = 127;
+int ch_width_6 = 127;
 
 
 Servo ch1;
@@ -85,6 +88,10 @@ Signal data;
 #define MITTE 170
 
 /*
+
+*/
+
+/*
 // SMD
 #define S0  PD0     // PD0 // YAW
 #define S1  PD1     // PD1 // PITCH
@@ -93,11 +100,7 @@ Signal data;
 #define IO0 PD4     // PD4 // AUX
 //#define IO1 A0    // PD1
 
-#define CE_PIN 10   // PB2
-#define CSN_PIN 9  // PB1
 */
-
-
 
 
 // RC_NRF_REC_1
@@ -108,6 +111,12 @@ Signal data;
 
 #define IO0 PD3     // AUX
 #define IO1 PD2    // AUX2
+
+
+
+uint8_t PINARRAY[4][8] = {{0}};
+
+
 
 #define CE_PIN 10   // PB2
 #define CSN_PIN 9  // PB1
@@ -245,7 +254,7 @@ uint16_t readSensor()
     pressurearray[(pressurecounter % 8)] = pressureint;
 
     altitude = MS5611.getAltitude(seaLevelPressure);
-    ackData[2] = altitude;
+    
     altitudeint = (uint32_t)(altitude) ;
  
     altarray[(pressurecounter % 8)] = altitudeint;
@@ -268,7 +277,20 @@ uint16_t readSensor()
 
 void setup() 
 {
-  
+
+
+  switch (BOARD)
+  {
+    case R_SMD:
+    {
+
+    }break;
+    case R_DIL:
+    {
+
+    }break;
+  }
+
   LCD_DDR |= (1<<LCD_RSDS_PIN);
   LCD_DDR |= (1<<LCD_ENABLE_PIN);
   LCD_DDR |= (1<<LCD_CLOCK_PIN);
@@ -282,13 +304,19 @@ void setup()
   DDRB |= (1<<PB0); // LED
   DDRC &= ~(1<<PC3); // Batt
   DDRC |= (1<<PC5); // Buzzer
+  
+  DDRC |= (1<<PC0);
+  DDRC |= (1<<PC1);
+  DDRC |= (1<<PC2);
+
 
   // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
   ch1.attach(S0); // YAW
   ch2.attach(S1); // PITCH
   ch3.attach(S2); // ROLL
-  ch4.attach(S3); // THROTTLE
-  //ch5.attach(IO0);
+  ch3.attach(S3); // THROTTLE
+
+  //ch5.attach(IO0]);
   //ch6.attach(IO1);
                                                        
   ResetData();                                            
@@ -315,9 +343,10 @@ void setup()
     lcd_puts("MS5611 not found: ");
     //  while (1);
   }
+   
+   
   MS5611.setOversampling(OSR_HIGH);
-  //Serial.println();
-  //Serial.println("Celsius\tmBar\tMeter\tFeet");
+  
   _delay_ms(1000);
   lcd_clr_line(3);
   for (uint8_t i=0;i<16;i++)
@@ -399,7 +428,7 @@ void loop()
     lcd_putc(' ');
     //uint16_t diff = startpressure - aktpressure ;
     uint8_t diff = altitude - startaltitude +1;
-
+    ackData[2] = diff+77;
 
     lcd_putint12(diff);
     //lcd_putc(' ');
@@ -505,7 +534,7 @@ void loop()
      
     //ackData[0] = data.yaw;
     ackData[1] = data.pitch;
-    ackData[2] = data.roll;
+    //ackData[2] = data.roll;
     //ackData[3] = data.throttle; // neu ADC BATT
     
     recvData();
