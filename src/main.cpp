@@ -7,16 +7,16 @@
 #include "lcd.h"
 #include "expo.h"
 
-#define TEST    1
+#define TEST    0
 #define R_SMD 0
 #define  R_DIL 1
 #define BOARD 1
 /*
-RC_nRF_Receiver A328 payload
-
-PCB: RC_nRF24_A8_1
-
-*/
+ RC_nRF_Receiver A328 payload
+ 
+ PCB: RC_nRF24_A8_1
+ 
+ */
 
 #include "MS5611.h"
 
@@ -36,6 +36,30 @@ uint16_t radiocounter = 1;
 
 uint8_t radiostatus = 0;
 
+// MS%5611
+float temperature = 0;
+const float seaLevelPressure = 1013.25;
+float pressuremittel = 0;
+float pressurediff = 0;
+float startpressuremittel = 0;
+float faktor = 0.02;
+float pressure = 0;
+uint16_t pressureint = 0;
+
+float altitude = 0;
+float startaltitude = 0;
+float altitudemittel = 0;
+
+uint16_t altitudeint = 0;
+uint32_t oldpressuremittel = 0;
+uint16_t aktpressure = 0;
+volatile uint16_t aktaltitude = 0;
+float startpressure = 0;
+uint16_t startpressureint = 0;
+const float mittelfaktor = 0.1;
+
+
+//
 // ack
 
 // ********************
@@ -73,14 +97,14 @@ Servo ch6;
 
 struct Signal 
 {
-
-byte throttle;
-byte pitch;  
-byte roll;
-byte yaw;
-byte aux1;
-byte aux2;
-    
+   
+   byte throttle;
+   byte pitch;  
+   byte roll;
+   byte yaw;
+   byte aux1;
+   byte aux2;
+   
 };
 
 Signal data;
@@ -88,19 +112,19 @@ Signal data;
 #define MITTE 170
 
 /*
-
-*/
+ 
+ */
 
 /*
-// SMD
-#define S0  PD0     // PD0 // YAW
-#define S1  PD1     // PD1 // PITCH
-#define S2  PD2     // PD2 // ROLL
-#define S3  PD3     // PD3 // THROTTLE
-#define IO0 PD4     // PD4 // AUX
-//#define IO1 A0    // PD1
-
-*/
+ // SMD
+ #define S0  PD0     // PD0 // YAW
+ #define S1  PD1     // PD1 // PITCH
+ #define S2  PD2     // PD2 // ROLL
+ #define S3  PD3     // PD3 // THROTTLE
+ #define IO0 PD4     // PD4 // AUX
+ //#define IO1 A0    // PD1
+ 
+ */
 
 
 // RC_NRF_REC_1
@@ -112,7 +136,10 @@ Signal data;
 #define IO0 PD3     // AUX
 #define IO1 PD2    // AUX2
 
+#define OSZIA  PD3
 
+#define OSZIAHI PORTD |= (1<<PD3)
+#define OSZIALO PORTD &= ~(1<<PD3)
 
 uint8_t PINARRAY[4][8] = {{0}};
 
@@ -124,46 +151,46 @@ uint8_t PINARRAY[4][8] = {{0}};
 void initADC()
 {
    ADCSRA = (1<<ADEN) | (1<<ADPS2) | (1<<ADPS0);    // Frequenzvorteiler auf 32 setzen und ADC aktivieren 
- 
-  //ADMUX = derKanal;                      // übergebenen Kanal waehlen
-
-  ADMUX |= (1<<REFS1) | (1<<REFS0); // interne Referenzspannung nutzen 
-  //ADMUX |= (1<<REFS0); // VCC als Referenzspannung nutzen 
- 
-  /* nach Aktivieren des ADC wird ein "Dummy-Readout" empfohlen, man liest
-     also einen Wert und verwirft diesen, um den ADC "warmlaufen zu lassen" */
-  ADCSRA |= (1<<ADSC);              // eine ADC-Wandlung (Der ADC setzt dieses Bit ja wieder auf 0 nach dem Wandeln)
-  while ( ADCSRA & (1<<ADSC) ) {
-     ;     // auf Abschluss der Wandlung warten 
-  }
+   
+   //ADMUX = derKanal;                      // übergebenen Kanal waehlen
+   
+   ADMUX |= (1<<REFS1) | (1<<REFS0); // interne Referenzspannung nutzen 
+   //ADMUX |= (1<<REFS0); // VCC als Referenzspannung nutzen 
+   
+   /* nach Aktivieren des ADC wird ein "Dummy-Readout" empfohlen, man liest
+    also einen Wert und verwirft diesen, um den ADC "warmlaufen zu lassen" */
+   ADCSRA |= (1<<ADSC);              // eine ADC-Wandlung (Der ADC setzt dieses Bit ja wieder auf 0 nach dem Wandeln)
+   while ( ADCSRA & (1<<ADSC) ) {
+      ;     // auf Abschluss der Wandlung warten 
+   }
 }
 uint16_t readKanal(uint8_t derKanal) //Unsere Funktion zum ADC-Channel aus lesen
 {
-  uint8_t i;
-  uint16_t result = 0;         //Initialisieren wichtig, da lokale Variablen
-                               //nicht automatisch initialisiert werden und
-                               //zufällige Werte haben. Sonst kann Quatsch rauskommen
+   uint8_t i;
+   uint16_t result = 0;         //Initialisieren wichtig, da lokale Variablen
+   //nicht automatisch initialisiert werden und
+   //zufällige Werte haben. Sonst kann Quatsch rauskommen
    ADMUX &= 0XF0;         //clearing channels
    ADMUX |= derKanal; 
-  // Eigentliche Messung - Mittelwert aus 4 aufeinanderfolgenden Wandlungen
-  for(i=0;i<4;i++)
-  {
-    ADCSRA |= (1<<ADSC);            // eine Wandlung
-    while ( ADCSRA & (1<<ADSC) ) {
-      ;     // auf Abschluss der Wandlung warten 
-    }
-    result += ADCW;            // Wandlungsergebnisse aufaddieren
-  }
-//  ADCSRA &= ~(1<<ADEN);             // ADC deaktivieren ("Enable-Bit" auf LOW setzen)
- 
-  result /= 4;                     // Summe durch vier teilen = arithm. Mittelwert
- 
-  return result;
+   // Eigentliche Messung - Mittelwert aus 4 aufeinanderfolgenden Wandlungen
+   for(i=0;i<4;i++)
+   {
+      ADCSRA |= (1<<ADSC);            // eine Wandlung
+      while ( ADCSRA & (1<<ADSC) ) {
+         ;     // auf Abschluss der Wandlung warten 
+      }
+      result += ADCW;            // Wandlungsergebnisse aufaddieren
+   }
+   //  ADCSRA &= ~(1<<ADEN);             // ADC deaktivieren ("Enable-Bit" auf LOW setzen)
+   
+   result /= 4;                     // Summe durch vier teilen = arithm. Mittelwert
+   
+   return result;
 }
 
 const uint64_t pipeIn = 0xABCDABCD71LL;
 
-  // instantiate an object for the nRF24L01 transceiver
+// instantiate an object for the nRF24L01 transceiver
 RF24 radio(CE_PIN, CSN_PIN);
 
 
@@ -171,210 +198,234 @@ MS5611 MS5611(0x77);
 
 void ResetData()
 {
-
-data.throttle = 0;   // Define the initial value of each data input. 
-data.roll = MITTE;
-data.pitch = MITTE;
-data.yaw = MITTE+30;
-data.aux1 = 0;                                              
-data.aux2 = 0;
-resetcounter++;                                               
+   
+   data.throttle = 0;   // Define the initial value of each data input. 
+   data.roll = MITTE;
+   data.pitch = MITTE;
+   data.yaw = MITTE+30;
+   data.aux1 = 0;                                              
+   data.aux2 = 0;
+   resetcounter++;                                               
 }
 
 uint8_t initradio(void)
 {
-    ResetData();                   // Configure the NRF24 module  | NRF24 Modül konfigürasyonu
-  radio.begin();
-  radio.openReadingPipe(1,pipeIn);
-  //radio.setChannel(100);
-  radio.setChannel(124);
-
-  // ********************
-  // ACK Payload ********
-  //radio.setAutoAck(false);
-  // ********************
-  // ********************
-
-  //radio.setDataRate(RF24_250KBPS);    // The lowest data rate value for more stable communication  | Daha kararlı iletişim için en düşük veri hızı.
-  radio.setDataRate(RF24_2MBPS); // Set the speed of the transmission to the quickest available
-  radio.setPALevel(RF24_PA_MAX);                           // Output power is set for maximum |  Çıkış gücü maksimum için ayarlanıyor.
-  radio.setPALevel(RF24_PA_MIN); 
-  radio.setPALevel(RF24_PA_MAX); 
-  
-
-  // ********************
-  // ACK Payload ********
-  radio.enableDynamicPayloads();
-  radio.enableAckPayload();
-  // ********************
+   ResetData();                   // Configure the NRF24 module  | NRF24 Modül konfigürasyonu
+   radio.begin();
+   radio.openReadingPipe(1,pipeIn);
+   //radio.setChannel(100);
+   radio.setChannel(124);
    
-  radio.startListening(); 
-     if (radio.failureDetected) 
-  {
-    radio.failureDetected = false;
-    delay(250);
-    lcd_gotoxy(18,0);
-    lcd_puts("-");
-
-    return 0;
-  }
-  else
-  {
-    ResetData();
-    lcd_gotoxy(18,0);
-    lcd_puts("+");
-    return 1;
-
-  }
-// Start the radio comunication for receiver | Alıcı için sinyal iletişimini başlatır.
- 
+   // ********************
+   // ACK Payload ********
+   //radio.setAutoAck(false);
+   // ********************
+   // ********************
+   
+   //radio.setDataRate(RF24_250KBPS);    // The lowest data rate value for more stable communication  | Daha kararlı iletişim için en düşük veri hızı.
+   radio.setDataRate(RF24_2MBPS); // Set the speed of the transmission to the quickest available
+   radio.setPALevel(RF24_PA_MAX);                           // Output power is set for maximum |  Çıkış gücü maksimum için ayarlanıyor.
+   radio.setPALevel(RF24_PA_MIN); 
+   radio.setPALevel(RF24_PA_MAX); 
+   
+   
+   // ********************
+   // ACK Payload ********
+   //radio.enableDynamicPayloads();
+   radio.enableAckPayload();
+   // ********************
+   
+   radio.startListening(); 
+   if (radio.failureDetected) 
+   {
+      radio.failureDetected = false;
+      delay(250);
+      lcd_gotoxy(18,0);
+      lcd_puts("-");
+      
+      return 0;
+   }
+   else
+   {
+      ResetData();
+      lcd_gotoxy(18,0);
+      lcd_puts("+");
+      return 1;
+      
+   }
+   // Start the radio comunication for receiver | Alıcı için sinyal iletişimini başlatır.
+   
 }
 
-float pressure = 0;
-uint16_t pressureint = 0;
+
+
 float temperatur = 0;
-double altitude = 0;
-uint32_t altitudeint = 0;
-uint32_t oldpressuremittel = 0;
-uint16_t aktpressure = 0;
-volatile uint16_t aktaltitude = 0;
-uint16_t startpressure = 0;
-uint16_t startaltitude = 0;
-const float seaLevelPressure = 1013.25; 
+
+void readStartpressure()
+{
+  startpressure = MS5611.getPressure();
+}
 
 uint16_t readSensor()
 {
    MS5611.read();    
-    temperatur = MS5611.getTemperature();
-
-
-    pressure = MS5611.getPressure();
-    pressureint = (uint16_t)(pressure*100) ;
-    
-    pressurearray[(pressurecounter % 8)] = pressureint;
-
-    altitude = MS5611.getAltitude(seaLevelPressure);
-    
-    altitudeint = (uint32_t)(altitude) ;
- 
-    altarray[(pressurecounter % 8)] = altitudeint;
-    pressurecounter++;
-    //oldpressuremittel = pressuremittel;
-
-    uint32_t pressuremittel = 0;
-    uint32_t altmittel = 0;
-    for (uint8_t i=0;i<8;i++)
+   temperatur = MS5611.getTemperature();
+   
+   
+   
+   pressure = 100 * MS5611.getPressure(); // 2 Kommastellen
+   //pressureint = (uint16_t)(pressure) ;
+   
+   // Umwandlung zu Int
+    if (pressuremittel == 0)
     {
-      pressuremittel += pressurearray[i];
-      altmittel += altarray[i];
+      pressuremittel = pressure;
     }
-    pressuremittel /= 8 ;
-    altmittel /= 8;
-    aktaltitude = altitudeint ;//& 0xFFFF;
-      
-    return pressuremittel & 0xFFFF;
+    else
+    {
+      pressuremittel = pressuremittel + faktor * ( pressure - pressuremittel);
+    }
+   
+   //pressureint = (uint16_t)(pressuremittel) ;
+   
+   //pressureint = (pressureint) & 0xFF;
+    
+   //altitude = MS5611.getAltitude(seaLevelPressure);
+   altitude = 10 * MS5611.getAltitude(seaLevelPressure);
+
+    if (altitudemittel == 0)
+    {
+      altitudemittel = altitude;
+    }
+    else
+    {
+      altitudemittel = altitudemittel + faktor * (altitude - altitudemittel);
+    }
+   altitudeint = (uint16_t)(altitudemittel) ;
+   
+   return pressuremittel ;
 }
 
 void setup() 
 {
+   
+   
+   switch (BOARD)
+   {
+      case R_SMD:
+      {
+         
+      }break;
+      case R_DIL:
+      {
+         
+      }break;
+   }
+   
+   LCD_DDR |= (1<<LCD_RSDS_PIN);
+   LCD_DDR |= (1<<LCD_ENABLE_PIN);
+   LCD_DDR |= (1<<LCD_CLOCK_PIN);
+   
+   lcd_initialize(LCD_FUNCTION_8x2, LCD_CMD_ENTRY_INC, LCD_CMD_ON);
+   delay(5);
+   lcd_puts("Guten Tag\0");
+   delay(1000);
+   lcd_clr_line(0);
+   
+   DDRB |= (1<<PB0); // LED
+   DDRC &= ~(1<<PC3); // Batt
+   DDRC |= (1<<PC5); // Buzzer // SCL
+   
+   DDRC |= (1<<PC0);
+   DDRC |= (1<<PC1);
+   DDRC |= (1<<PC2);
+   
+   DDRD |= (1<<PD3); // OSZIA
+   PORTD |= (1<<PD3); // OSZIA
+   
+   // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
+   ch1.attach(S0); // YAW
+   ch2.attach(S1); // PITCH
+   ch3.attach(S2); // ROLL
+   ch3.attach(S3); // THROTTLE
+   
+   //ch5.attach(IO0]);
+   //ch6.attach(IO1);
+   
+   ResetData();                                            
+   
+   if(initradio())
+   {
+      radiostatus |= (1<<RADIOSTARTED);
+      lcd_gotoxy(19,0);
+      lcd_puts("+");
+   }
+   initADC();
+   
+   Wire.begin();
+   if (MS5611.begin() == true)
+   {
+      lcd_gotoxy(0,3);
+      lcd_puts("MS5611 found: ");
+      lcd_putint12(MS5611.getAddress());
+   }
+   else
+   {
+      lcd_gotoxy(0,3);
+      lcd_puts("MS5611 not found: ");
+   }
+   
+   //MS5611.reset(0);
+   
+   MS5611.setOversampling(OSR_HIGH);
+   
+   _delay_ms(1000);
+   lcd_clr_line(3);
 
+ 
+   for(uint8_t i=0;i<10;i++)
+   {
+      float temp = MS5611.getPressure();
+      if(startpressure != 0)
+      {
+           startpressure = startpressure + mittelfaktor * (temp - startpressure);
 
-  switch (BOARD)
-  {
-    case R_SMD:
-    {
-
-    }break;
-    case R_DIL:
-    {
-
-    }break;
-  }
-
-  LCD_DDR |= (1<<LCD_RSDS_PIN);
-  LCD_DDR |= (1<<LCD_ENABLE_PIN);
-  LCD_DDR |= (1<<LCD_CLOCK_PIN);
-
-	lcd_initialize(LCD_FUNCTION_8x2, LCD_CMD_ENTRY_INC, LCD_CMD_ON);
-  delay(5);
-	lcd_puts("Guten Tag\0");
-  delay(1000);
-  lcd_clr_line(0);
-  
-  DDRB |= (1<<PB0); // LED
-  DDRC &= ~(1<<PC3); // Batt
-  DDRC |= (1<<PC5); // Buzzer
-  
-  DDRC |= (1<<PC0);
-  DDRC |= (1<<PC1);
-  DDRC |= (1<<PC2);
-
-
-  // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
-  ch1.attach(S0); // YAW
-  ch2.attach(S1); // PITCH
-  ch3.attach(S2); // ROLL
-  ch3.attach(S3); // THROTTLE
-
-  //ch5.attach(IO0]);
-  //ch6.attach(IO1);
-                                                       
-  ResetData();                                            
-  
-  if(initradio())
-  {
-    radiostatus |= (1<<RADIOSTARTED);
-    lcd_gotoxy(19,0);
-    lcd_puts("+");
-  }
-  initADC();
-
-  Wire.begin();
-  if (MS5611.begin() == true)
-  {
-    lcd_gotoxy(0,3);
-    lcd_puts("MS5611 found: ");
+      }
+      else
+      {
+          startpressure = temp;
+      }
+      
+   } // for
+   startaltitude = MS5611.getAltitude(seaLevelPressure);
     
-    lcd_putint12(MS5611.getAddress());
-  }
-  else
-  {
-    lcd_gotoxy(0,3);
-    lcd_puts("MS5611 not found: ");
-    //  while (1);
-  }
+  startpressureint = (uint16_t)(100*startpressure) ;
+   lcd_gotoxy(0,2);
+   lcd_putint16(startpressureint);
+  lcd_putc('*');
+  uint16_t startaltitudeint = (uint16_t)startaltitude;
+  startaltitudeint += 1;
+   lcd_putint12(startaltitudeint);
+   lcd_putc('*');
+   //startpressure += 10;
    
-   
-  MS5611.setOversampling(OSR_HIGH);
-  
-  _delay_ms(1000);
-  lcd_clr_line(3);
-  for (uint8_t i=0;i<16;i++)
-  {
-    startpressure = readSensor();
-  }
-  startaltitude = altitude;
-  lcd_gotoxy(0,2);
-  lcd_putint12(startpressure);
-  startpressure += 10;
-
 }
 unsigned long lastRecvTime = 0;
 
 void recvData()
 {
-  if ( radio.available() ) 
-  {
-    radiocounter++;
-    radio.read(&data, sizeof(Signal));
-    lastRecvTime = millis();   // Receive the data | Data alınıyor
-
-    // ********************
-    // ACK Payload ********
-    radio.writeAckPayload(1, &ackData, sizeof(ackData));
-    // ********************
-    // ********************
-  }
+   if ( radio.available() ) 
+   {
+      radiocounter++;
+      radio.read(&data, sizeof(Signal));
+      lastRecvTime = millis();   // Receive the data | Data alınıyor
+      
+      // ********************
+      // ACK Payload ********
+      radio.writeAckPayload(1, &ackData, sizeof(ackData));
+      // ********************
+      // ********************
+   }
 }
 
 
@@ -382,192 +433,150 @@ void recvData()
 
 void loop() 
 {
-
-  pressuredelaycounter++;
-  if(pressuredelaycounter > 0xFF)
-  {
-    pressuredelaycounter = 0;
-    aktpressure = readSensor();
-    /*
-    MS5611.read();    
-    temperatur = MS5611.getTemperature();
-
-    pressure = MS5611.getPressure();
-    pressureint = (uint16_t)((pressure + 40.0) / 160.0 * (float)0xFFFF) ;
-    
-    pressurearray[(pressurecounter % 16)] = pressureint;
-    pressurecounter++;
-    oldpressuremittel = pressuremittel;
-
-    pressuremittel = 0;
-    for (uint8_t i=0;i<16;i++)
-    {
-      pressuremittel += pressurearray[i];
-    }
-    pressuremittel /= 16 ;
-    
-    diff = 100 +(pressuremittel - oldpressuremittel);
-    altitude = MS5611.getAltitude();
-    altitude *= 100;
-  */
-  }
-
-  loopcounter++;
- 
-  if(loopcounter >= BLINKRATE)
-  {
-    
-    lcd_gotoxy(5,2);
-    lcd_putint12(temperatur);
-    lcd_putc(' ');
-
-    lcd_gotoxy(0,3);
-    lcd_putint16(pressureint);
-    lcd_putc(' ');
-    lcd_putint12(aktpressure);
-    lcd_putc(' ');
-    //uint16_t diff = startpressure - aktpressure ;
-    uint8_t diff = altitude - startaltitude +1;
-    ackData[2] = diff+77;
-
-    lcd_putint12(diff);
-    //lcd_putc(' ');
-    lcd_gotoxy(10,2);
-    lcd_putint12(altitude);
-    // lcd_putc(' ');
-
-
-    ackData[3] = readKanal(BATT_PIN) >> 2;
-    PORTB ^= (1<<0);
-    
-    loopcounter = 0;
-    impulscounter++;
-    
-    //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
-    //digitalWrite(A0, ! digitalRead(A0))
-    //Serial.println(data.yaw);
-    if(TEST)
-    {
-      /*
-      lcd_gotoxy(0,0);
-      lcd_putint(impulscounter);
-      */
-      lcd_gotoxy(4,0);
-      lcd_putint12(resetcounter);
-      
-      lcd_gotoxy(10,0);
-      lcd_putint12(radiocounter);
-      
-      lcd_gotoxy(10,1);
-      lcd_putint12(ackData[2]);// alt
-      lcd_gotoxy(16,1);
-      lcd_putint12(ackData[3]); // Batt
-
-      lcd_gotoxy(0,1);
-      lcd_putint(data.yaw);
-      lcd_putc(' ');
-      //lcd_putint12(ch_width_1);
-      //lcd_putc(' ');
-      lcd_putint(data.pitch);
-      //lcd_putc(' ');
-      //lcd_putint12(ch_width_2);
-  
-      /*
-      lcd_putint(data.roll);
-      lcd_putc(' ');
-      lcd_putint(data.throttle);
-      */
-      //lcd_gotoxy(16,1);
-      //lcd_putint(yawraw);
-
-      //lcd_putc(' ');
-      //lcd_gotoxy(10,2);
-      //lcd_putint(ch_width_2);
-      //lcd_putc(' ');
-      //lcd_putint(data.pitch);
-      //lcd_putc(' ');
-      
-      /*
-      lcd_putint(ch_width_3);
-      lcd_putc(' ');
-      lcd_gotoxy(0,3);
-      lcd_putint(ch_width_4);
-      lcd_putc(' ');
-      lcd_putint(ch_width_5);
-      lcd_putc(' ');
-      lcd_putint(ch_width_6);
-      */
-    
-
-      if( radiostatus & (1<<RADIOSTARTED))
+   
+   pressuredelaycounter++;
+   if(pressuredelaycounter > 0xFF)
+   {
+      pressuredelaycounter = 0;
+      OSZIALO;
+      aktpressure = readSensor();
+      OSZIAHI;
+      ackData[2] = aktpressure & 0x8F;
+      ackData[1] = (altitudeint-100) & 0xFF ;
+   }
+   
+   loopcounter++;
+   
+   if(loopcounter >= BLINKRATE)
+   {
+      if(TEST)
       {
-        recvData();
-        //lcd_gotoxy(16,3);
-        //lcd_puts("strt");
+         //uint16_t diff = altitude - startaltitude +1;
+         lcd_gotoxy(15,2);
+         lcd_putint12(temperatur);
+         //lcd_putc(' ');
+         //(diff);
+         
+         lcd_gotoxy(0,3);
+         lcd_putint16(pressuremittel);
+         lcd_putc(' ');
+         lcd_putint(pressuremittel);
+
+         lcd_putc(' ');
+         lcd_putint12(altitudeint);
+         
+         lcd_putc(' ');
+         lcd_putint(altitudeint);
+
+         //uint16_t diff = startpressure - aktpressure ;
+         
+         
+         
+         //lcd_putint12(startaltitude);
+         //lcd_putc(' ');
+         //lcd_gotoxy(10,2);490,0,255);
+         //lcd_putint12(altitudeint);
+         // lcd_putc(' ');
       }
-      else
+      
+      uint16_t batt = readKanal(BATT_PIN);// BATT 8.4V: 998    6.4V: 748  5.0: 700
+      //lcd_gotoxy(0,1);
+      //lcd_putint12(batt);
+      ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
+     // lcd_putc(' ');
+     // lcd_putint(ackData[3]);
+
+      PORTB ^= (1<<0);
+      
+      loopcounter = 0;
+      impulscounter++;
+      
+      //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
+      //digitalWrite(A0, ! digitalRead(A0))
+      //Serial.println(data.yaw);
+      if(TEST)
       {
-        lcd_gotoxy(16,3);
-        lcd_puts("xxxx");
-      }
-    } // if TEST
-  }
-  
-  /*
-  if ((firsttimecounter < FIRSTTIMEDELAY ) && !(radiostatus & (1<<RADIOSTARTED)))
-  {
+       
+         lcd_gotoxy(4,0);
+         lcd_putint12(resetcounter);
+         
+         lcd_gotoxy(10,0);
+         lcd_putint12(radiocounter);
+         
+         
+         lcd_gotoxy(0,1);
+         lcd_putint(data.yaw);
+         lcd_putc(' ');
+         //lcd_putint12(ch_width_1);
+         //lcd_putc(' ');
+         lcd_putint(data.pitch);
+         //lcd_putc(' ');
+         //lcd_putint12(ch_width_2);
+         
+         lcd_gotoxy(10,1);
+         lcd_putint(ackData[2]);// alt
+         lcd_gotoxy(16,1);
+         lcd_putint12(ackData[3]); // Batt
+         
+      } // if TEST
+         
+      
+      
+   }
+   
+   /*
+    if ((firsttimecounter < FIRSTTIMEDELAY ) && !(radiostatus & (1<<RADIOSTARTED)))
+    {
     firsttimecounter++;
-  }
-  else if  (firsttimecounter ==  FIRSTTIMEDELAY )
-  {
+    }
+    else if  (firsttimecounter ==  FIRSTTIMEDELAY )
+    {
     if(initradio())
     {
-      radiostatus |= (1<<RADIOSTARTED);
+    radiostatus |= (1<<RADIOSTARTED);
     }
     
-  }
-  */
-
-  if( radiostatus & (1<<RADIOSTARTED))
-  {
-
-     
-    //ackData[0] = data.yaw;
-    ackData[1] = data.pitch;
-    //ackData[2] = data.roll;
-    //ackData[3] = data.throttle; // neu ADC BATT
-    
-    recvData();
-    unsigned long now = millis();
-    if ( now - lastRecvTime > 1000 ) 
-    {
-      ResetData();  // Signal lost.. Reset data
     }
-  } 
-  
-  //data.yaw = (impulscounter & 0xFF );//& 0xFF00) >> 8;
-
-  // map: 
-  // map(value, fromLow, fromHigh, toLow, toHigh)
-  
-  ch_width_1 = map(data.yaw, 0, 255, 1000, 2000);       // YAW
-  ch_width_2 = map(data.pitch, 0, 255, 1000, 2000);     // PITCH
-
-  ch_width_3 = map(data.roll, 0, 255, 1000, 2000);      // ROLL
-  ch_width_4 = map(data.throttle, 0, 255, 1000, 2000);  // THROTTLE
-
-  // ON/OFF
-  ch_width_5 = map(data.aux1, 0, 1, 1000, 2000); 
-  //ch_width_6 = map(data.aux2, 0, 1, 1000, 2000); 
-  //ch_width_6 = map((impulscounter & 0xFF ), 0, 255, 1000, 2000);
-
-  //ch_width_1 = 100;
-
-  ch1.writeMicroseconds(ch_width_1);           // Write the PWM signal
-  ch2.writeMicroseconds(ch_width_2);
-  ch3.writeMicroseconds(ch_width_3);
-  ch4.writeMicroseconds(ch_width_4);
-  ch5.writeMicroseconds(ch_width_5);
-  //ch6.writeMicroseconds(ch_width_6); 
+    */
+   
+   if( radiostatus & (1<<RADIOSTARTED))
+   {
+      
+      
+      ackData[0] = data.yaw;
+      //ackData[1] = data.pitch;
+      
+      recvData();
+      unsigned long now = millis();
+      if ( now - lastRecvTime > 1000 ) 
+      {
+         ResetData();  // Signal lost.. Reset data
+      }
+   } 
+   
+   //data.yaw = (impulscounter & 0xFF );//& 0xFF00) >> 8;
+   
+   // map: 
+   // map(value, fromLow, fromHigh, toLow, toHigh)
+   
+   ch_width_1 = map(data.yaw, 0, 255, 1000, 2000);       // YAW
+   ch_width_2 = map(data.pitch, 0, 255, 1000, 2000);     // PITCH
+   
+   ch_width_3 = map(data.roll, 0, 255, 1000, 2000);      // ROLL
+   ch_width_4 = map(data.throttle, 0, 255, 1000, 2000);  // THROTTLE
+   
+   // ON/OFF
+   ch_width_5 = map(data.aux1, 0, 1, 1000, 2000); 
+   //ch_width_6 = map(data.aux2, 0, 1, 1000, 2000); 
+   //ch_width_6 = map((impulscounter & 0xFF ), 0, 255, 1000, 2000);
+   
+   //ch_width_1 = 100;
+   
+   ch1.writeMicroseconds(ch_width_1);           // Write the PWM signal
+   ch2.writeMicroseconds(ch_width_2);
+   ch3.writeMicroseconds(ch_width_3);
+   ch4.writeMicroseconds(ch_width_4);
+   ch5.writeMicroseconds(ch_width_5);
+   //ch6.writeMicroseconds(ch_width_6); 
 }
 
