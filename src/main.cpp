@@ -7,7 +7,7 @@
 #include "lcd.h"
 #include "expo.h"
 
-#define TEST    0
+#define TEST    1
 #define R_SMD 0
 #define  R_DIL 1
 #define BOARD 1
@@ -480,9 +480,13 @@ void loop()
       }
       
       uint16_t batt = readKanal(BATT_PIN);// BATT 8.4V: 998    6.4V: 748  5.0: 700
-      //lcd_gotoxy(0,1);
-      //lcd_putint12(batt);
-      ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
+     // lcd_gotoxy(0,0);
+     // lcd_putint12(batt);
+      batt = constrain(batt, 600, 1000);
+      {
+          ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
+      }
+     
      // lcd_putc(' ');
      // lcd_putint(ackData[3]);
 
