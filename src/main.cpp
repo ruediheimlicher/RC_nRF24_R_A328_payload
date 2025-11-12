@@ -7,11 +7,9 @@
 #include "lcd.h"
 #include "expo.h"
 
-#define TEST    1
-#define R_SMD 0
-#define  R_DIL 1
-#define BOARD 1
-/*
+#include "defines.h"
+
+
  RC_nRF_Receiver A328 payload
  
  PCB: RC_nRF24_A8_1
@@ -22,11 +20,7 @@
 
 //#define LOOPLED A3 // PC3
 
-#define LOOPLED PB0
 
-#define BATT_PIN   PC3
-
-#define BLINKRATE 0x02FF
 
 uint16_t loopcounter = 0;
 
@@ -36,7 +30,7 @@ uint16_t radiocounter = 1;
 
 uint8_t radiostatus = 0;
 
-// MS%5611
+// MS5611
 float temperature = 0;
 const float seaLevelPressure = 1013.25;
 float pressuremittel = 0;
@@ -74,9 +68,7 @@ uint16_t altarray[16] = {0};
 uint8_t pressurecounter = 0;
 uint16_t pressuredelaycounter = 0;
 
-#define FIRSTTIMEDELAY  0x0FF
-#define RADIOSTARTED    1
-#define RADIORUNNING    2
+#
 uint16_t firsttimecounter = 0;
 
 
@@ -109,7 +101,7 @@ struct Signal
 
 Signal data;
 
-#define MITTE 170
+
 
 /*
  
@@ -127,26 +119,11 @@ Signal data;
  */
 
 
-// RC_NRF_REC_1
-#define S0  A0      // YAW
-#define S1  A1      //PITCH
-#define S2  A2      // ROLL
-#define S3  PD0     // THROTTLE
-
-#define IO0 PD3     // AUX
-#define IO1 PD2    // AUX2
-
-#define OSZIA  PD3
-
-#define OSZIAHI PORTD |= (1<<PD3)
-#define OSZIALO PORTD &= ~(1<<PD3)
 
 uint8_t PINARRAY[4][8] = {{0}};
 
 
 
-#define CE_PIN 10   // PB2
-#define CSN_PIN 9  // PB1
 
 void initADC()
 {
