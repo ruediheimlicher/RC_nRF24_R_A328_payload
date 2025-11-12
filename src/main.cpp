@@ -482,6 +482,12 @@ void loop()
       uint16_t batt = readKanal(BATT_PIN);// BATT 8.4V: 998    6.4V: 748  5.0: 700
      // lcd_gotoxy(0,0);
      // lcd_putint12(batt);
+
+     /*
+    map() begrenzt nicht.
+    Werte unter in_min → Ergebnis unter out_min.
+    Speicherung in byte → Unterlauf → scheinbar 0–255.
+    */
       batt = constrain(batt, 600, 1000);
       {
           ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
