@@ -32,6 +32,7 @@ uint8_t radiostatus = 0;
 
 // MS5611
 float temperature = 0;
+float temperaturmittel = 0;
 const float seaLevelPressure = 1013.25;
 float pressuremittel = 0;
 float pressurediff = 0;
@@ -248,7 +249,14 @@ uint16_t readSensor()
    MS5611.read();    
    temperatur = MS5611.getTemperature();
    
-   
+    if(temperature == 0)
+    {
+      temperaturmittel = temperature;
+    }
+    else
+    {
+      temperaturmittel = temperaturmittel + faktor * (temperature - temperaturmittel);
+    }
    
    pressure = 100 * MS5611.getPressure(); // 2 Kommastellen
    //pressureint = (uint16_t)(pressure) ;
@@ -376,15 +384,7 @@ void setup()
    } // for
    startaltitude = MS5611.getAltitude(seaLevelPressure);
     
-  startpressureint = (uint16_t)(100*startpressure) ;
-   lcd_gotoxy(0,2);
-   lcd_putint16(startpressureint);
-  lcd_putc('*');
-  uint16_t startaltitudeint = (uint16_t)startaltitude;
-  startaltitudeint += 1;
-   lcd_putint12(startaltitudeint);
-   lcd_putc('*');
-   //startpressure += 10;
+
    
 }
 unsigned long lastRecvTime = 0;
