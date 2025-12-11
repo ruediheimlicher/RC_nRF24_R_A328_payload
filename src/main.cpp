@@ -9,7 +9,7 @@
 
 #include "defines.h"
 
-
+/*
  RC_nRF_Receiver A328 payload
  
  PCB: RC_nRF24_A8_1
@@ -33,11 +33,12 @@ uint8_t radiostatus = 0;
 // MS5611
 float temperature = 0;
 float temperaturmittel = 0;
+ uint16_t temperature_int = 0;
 const float seaLevelPressure = 1013.25;
 float pressuremittel = 0;
 float pressurediff = 0;
 float startpressuremittel = 0;
-float faktor = 0.02;
+float faktor = 0.05;
 float pressure = 0;
 uint16_t pressureint = 0;
 
@@ -174,6 +175,8 @@ RF24 radio(CE_PIN, CSN_PIN);
 
 MS5611 MS5611(0x77);
 
+
+
 void ResetData()
 {
    
@@ -247,7 +250,7 @@ void readStartpressure()
 uint16_t readSensor()
 {
    MS5611.read();    
-   temperatur = MS5611.getTemperature();
+   temperature = MS5611.getTemperature();
    
     if(temperature == 0)
     {
@@ -258,10 +261,9 @@ uint16_t readSensor()
       temperaturmittel = temperaturmittel + faktor * (temperature - temperaturmittel);
     }
    
-   pressure = 100 * MS5611.getPressure(); // 2 Kommastellen
-   //pressureint = (uint16_t)(pressure) ;
+   pressure = MS5611.getPressure(); // 
    
-   // Umwandlung zu Int
+   // Filter
     if (pressuremittel == 0)
     {
       pressuremittel = pressure;
@@ -271,10 +273,7 @@ uint16_t readSensor()
       pressuremittel = pressuremittel + faktor * ( pressure - pressuremittel);
     }
    
-   //pressureint = (uint16_t)(pressuremittel) ;
-   
-   //pressureint = (pressureint) & 0xFF;
-    
+    /*
    //altitude = MS5611.getAltitude(seaLevelPressure);
    altitude = 10 * MS5611.getAltitude(seaLevelPressure);
 
@@ -287,7 +286,7 @@ uint16_t readSensor()
       altitudemittel = altitudemittel + faktor * (altitude - altitudemittel);
     }
    altitudeint = (uint16_t)(altitudemittel) ;
-   
+   */
    return pressuremittel ;
 }
 
@@ -360,9 +359,11 @@ void setup()
       lcd_puts("MS5611 not found: ");
    }
    
-   //MS5611.reset(0);
+   MS5611.reset(0);
    
    MS5611.setOversampling(OSR_HIGH);
+
+
    
    _delay_ms(1000);
    lcd_clr_line(3);
@@ -382,7 +383,7 @@ void setup()
       }
       
    } // for
-   startaltitude = MS5611.getAltitude(seaLevelPressure);
+   //startaltitude = MS5611.getAltitude(seaLevelPressure);
     
 
    
@@ -416,10 +417,19 @@ void loop()
    {
       pressuredelaycounter = 0;
       OSZIALO;
-      aktpressure = readSensor();
+      float pressurenew = readSensor(); // temperaturmittel, pressuremittel*10
       OSZIAHI;
-      ackData[2] = aktpressure & 0x8F;
-      ackData[1] = (altitudeint-100) & 0xFF ;
+      temperature_int = uint8_t(temperaturmittel * 5); // 3 Stellen <255
+      ackData[0] = temperature_int;
+
+      pressureint = (pressuremittel); // 
+      ackData[1] = (pressureint & 0xFF00)>>8;
+      ackData[2] = (pressureint & 0x00FF);
+
+
+
+      //ackData[2] = aktpressure & 0x8F;
+      //ackData[1] = (altitudeint-100) & 0xFF ;
    }
    
    loopcounter++;
@@ -429,21 +439,37 @@ void loop()
       if(TEST)
       {
          //uint16_t diff = altitude - startaltitude +1;
-         lcd_gotoxy(15,2);
-         lcd_putint12(temperatur);
-         //lcd_putc(' ');
+        
+        lcd_gotoxy(0,0);
+         lcd_putint(ackData[1]);
+         lcd_gotoxy(4,0);
+         lcd_putint(ackData[2]);
+         uint16_t pressureint2 = (ackData[1] <<8) | ackData[2];
+         lcd_gotoxy(8,0);
+         lcd_putint16(pressureint2);
+
+         lcd_gotoxy(0,2);
+         lcd_putint12(temperature);
+         lcd_gotoxy(6,2);
+         lcd_putint(temperature_int);
+
+         lcd_gotoxy(12,2);
+         lcd_putint12(temperaturmittel);
+         lcd_putc(' ');
          //(diff);
          
          lcd_gotoxy(0,3);
+         lcd_putint16(pressure);
+         lcd_putc(' ');
          lcd_putint16(pressuremittel);
          lcd_putc(' ');
-         lcd_putint(pressuremittel);
+         lcd_putint12(pressureint);
 
-         lcd_putc(' ');
-         lcd_putint12(altitudeint);
+         //lcd_putc(' ');
+         //lcd_putint12(altitudeint);
          
-         lcd_putc(' ');
-         lcd_putint(altitudeint);
+         //lcd_putc(' ');
+         //lcd_putint(altitudeint);
 
          //uint16_t diff = startpressure - aktpressure ;
          
@@ -484,10 +510,10 @@ void loop()
       if(TEST)
       {
        
-         lcd_gotoxy(4,0);
-         lcd_putint12(resetcounter);
+         //lcd_gotoxy(4,0);
+         //lcd_putint12(resetcounter);
          
-         lcd_gotoxy(10,0);
+         lcd_gotoxy(16,0);
          lcd_putint12(radiocounter);
          
          
@@ -500,10 +526,10 @@ void loop()
          //lcd_putc(' ');
          //lcd_putint12(ch_width_2);
          
-         lcd_gotoxy(10,1);
+         lcd_gotoxy(12,1);
          lcd_putint(ackData[2]);// alt
          lcd_gotoxy(16,1);
-         lcd_putint12(ackData[3]); // Batt
+         lcd_putint(ackData[3]); // Batt
          
       } // if TEST
          
@@ -530,7 +556,7 @@ void loop()
    {
       
       
-      ackData[0] = data.yaw;
+      //ackData[0] = data.yaw;
       //ackData[1] = data.pitch;
       
       recvData();
