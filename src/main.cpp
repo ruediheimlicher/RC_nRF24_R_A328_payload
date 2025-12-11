@@ -272,21 +272,7 @@ uint16_t readSensor()
     {
       pressuremittel = pressuremittel + faktor * ( pressure - pressuremittel);
     }
-   
-    /*
-   //altitude = MS5611.getAltitude(seaLevelPressure);
-   altitude = 10 * MS5611.getAltitude(seaLevelPressure);
 
-    if (altitudemittel == 0)
-    {
-      altitudemittel = altitude;
-    }
-    else
-    {
-      altitudemittel = altitudemittel + faktor * (altitude - altitudemittel);
-    }
-   altitudeint = (uint16_t)(altitudemittel) ;
-   */
    return pressuremittel ;
 }
 
