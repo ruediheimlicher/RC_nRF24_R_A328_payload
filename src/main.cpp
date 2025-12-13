@@ -237,7 +237,7 @@ uint16_t readSensor()
       temperaturmittel = temperaturmittel + faktor * (temperature - temperaturmittel);
     }
    
-   pressure = MS5611.getPressure(); // 
+   pressure = MS5611.getPressure() * 10; // 
    
    // Filter
     if (pressuremittel == 0)
@@ -280,7 +280,7 @@ void setup()
    LOOPLED_DDR |= (1<<LOOPLED);
 
    BATT_DDR &= ~(1<<BATT_PIN); // Batt
-   BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer // SCL
+   BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer 
    
 
    OSZIA_DDR |= (1<<OSZIA_PIN); // OSZIA
@@ -337,7 +337,6 @@ void setup()
       if(startpressure != 0)
       {
            startpressure = startpressure + mittelfaktor * (temp - startpressure);
-
       }
       else
       {
@@ -400,6 +399,7 @@ void loop()
    {
       if(!(PIND & (1<<TEST_PIN)))
       {
+         
          //uint16_t diff = altitude - startaltitude +1;
         
         lcd_gotoxy(0,0);
@@ -421,12 +421,13 @@ void loop()
          //(diff);
          
          lcd_gotoxy(0,3);
-         lcd_putint16(pressure);
+         lcd_putint12(pressuremittel);
+         /*
          lcd_putc(' ');
-         lcd_putint16(pressuremittel);
+         lcd_putint12(pressuremittel);
          lcd_putc(' ');
          lcd_putint12(pressureint);
-
+         */
          //lcd_putc(' ');
          //lcd_putint12(altitudeint);
          
@@ -442,6 +443,10 @@ void loop()
          //lcd_gotoxy(10,2);490,0,255);
          //lcd_putint12(altitudeint);
          // lcd_putc(' ');
+      }
+      else
+      {
+         
       }
       
       uint16_t batt = readKanal(BATT_PIN);// BATT 8.4V: 998    6.4V: 748  5.0: 700

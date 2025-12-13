@@ -34,6 +34,7 @@
 #define BUZZER_PORT   PORTD
 #define BUZZER_PIN    PD1
 
+#define BUZZER_ARDUINO_PIN  1
 
 
 
