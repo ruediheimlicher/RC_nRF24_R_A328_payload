@@ -17,9 +17,25 @@
 #define  R_DIL 1
 #define BOARD 1
 
-#define LOOPLED PB0
+#define LOOPLED_DDR   DDRB
+#define LOOPLED_PORT  PORTB
+#define LOOPLED       PB0
 
-#define BATT_PIN   PC3
+#define TEST_DDR      DDRD
+#define TEST_PORT     PORTD
+#define TEST_PIN      PD2
+
+
+#define BATT_DDR      DDRC
+#define BATT_PORT     PORTC
+#define BATT_PIN      PC3
+
+#define BUZZER_DDR    DDRD
+#define BUZZER_PORT   PORTD
+#define BUZZER_PIN    PD1
+
+
+
 
 #define BLINKRATE 0x01FF
 
@@ -50,11 +66,11 @@
  */
 
 
-#define TEST_PIN  PD2
 
+#define OSZIA_DDR       DDRD
+#define OSZIA_PORT     PORTD
 
-
-#define OSZIA_PIN  PD3
+#define OSZIA_PIN       PD3
 #define OSZIAHI PORTD |= (1<<PD3)
 #define OSZIALO PORTD &= ~(1<<PD3)
 

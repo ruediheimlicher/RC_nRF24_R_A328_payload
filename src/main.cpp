@@ -277,20 +277,17 @@ void setup()
    delay(1000);
    lcd_clr_line(0);
    
-   DDRB |= (1<<PB0); // LED
-   //pinMode(LOOPLED,OUTPUT);
-   DDRC &= ~(1<<BATT_PIN); // Batt
-   DDRC |= (1<<PC5); // Buzzer // SCL
-   
-   DDRC |= (1<<PC0);
-   DDRC |= (1<<PC1);
-   DDRC |= (1<<PC2);
-   
-   DDRD |= (1<<OSZIA_PIN); // OSZIA
-   PORTD |= (1<<OSZIA_PIN); // OSZIA
+   LOOPLED_DDR |= (1<<LOOPLED);
 
-   DDRD &= ~(1<<TEST_PIN); // TEST  INPUT
-   PORTD |= (1<<TEST_PIN); // TEST  PULLUP
+   BATT_DDR &= ~(1<<BATT_PIN); // Batt
+   BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer // SCL
+   
+
+   OSZIA_DDR |= (1<<OSZIA_PIN); // OSZIA
+   OSZIA_PORT |= (1<<OSZIA_PIN); // OSZIA
+
+   TEST_DDR &= ~(1<<TEST_PIN); // TEST  INPUT
+   TEST_PORT |= (1<<TEST_PIN); // TEST  PULLUP
    
    // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
    ch1.attach(S0); // YAW
