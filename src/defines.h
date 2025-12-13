@@ -10,7 +10,7 @@
 
 
 #ifndef DEFINES_h
-#define DEFIàNES_h
+#define DEFINES_h
 
 #define TEST    1
 #define R_SMD 0
@@ -21,7 +21,7 @@
 
 #define BATT_PIN   PC3
 
-#define BLINKRATE 0x02FF
+#define BLINKRATE 0x01FF
 
 #define FIRSTTIMEDELAY  0x0FF
 #define RADIOSTARTED    1
@@ -38,8 +38,23 @@
 #define IO0 PD3     // AUX
 #define IO1 PD2    // AUX2
 
-#define OSZIA  PD3
+/*
+ // SMD
+ #define S0  PD0     // PD0 // YAW
+ #define S1  PD1     // PD1 // PITCH
+ #define S2  PD2     // PD2 // ROLL
+ #define S3  PD3     // PD3 // THROTTLE
+ #define IO0 PD4     // PD4 // AUX
+ //#define IO1 A0    // PD1
+ 
+ */
 
+
+#define TEST_PIN  PD2
+
+
+
+#define OSZIA_PIN  PD3
 #define OSZIAHI PORTD |= (1<<PD3)
 #define OSZIALO PORTD &= ~(1<<PD3)
 

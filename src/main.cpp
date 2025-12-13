@@ -18,10 +18,6 @@
 
 #include "MS5611.h"
 
-//#define LOOPLED A3 // PC3
-
-
-
 uint16_t loopcounter = 0;
 
 uint8_t impulscounter = 0;
@@ -105,25 +101,6 @@ Signal data;
 
 
 
-/*
- 
- */
-
-/*
- // SMD
- #define S0  PD0     // PD0 // YAW
- #define S1  PD1     // PD1 // PITCH
- #define S2  PD2     // PD2 // ROLL
- #define S3  PD3     // PD3 // THROTTLE
- #define IO0 PD4     // PD4 // AUX
- //#define IO1 A0    // PD1
- 
- */
-
-
-
-uint8_t PINARRAY[4][8] = {{0}};
-
 
 
 
@@ -131,7 +108,6 @@ void initADC()
 {
    ADCSRA = (1<<ADEN) | (1<<ADPS2) | (1<<ADPS0);    // Frequenzvorteiler auf 32 setzen und ADC aktivieren 
    
-   //ADMUX = derKanal;                      // übergebenen Kanal waehlen
    
    ADMUX |= (1<<REFS1) | (1<<REFS0); // interne Referenzspannung nutzen 
    //ADMUX |= (1<<REFS0); // VCC als Referenzspannung nutzen 
@@ -143,6 +119,7 @@ void initADC()
       ;     // auf Abschluss der Wandlung warten 
    }
 }
+
 uint16_t readKanal(uint8_t derKanal) //Unsere Funktion zum ADC-Channel aus lesen
 {
    uint8_t i;
@@ -183,7 +160,7 @@ void ResetData()
    data.throttle = 0;   // Define the initial value of each data input. 
    data.roll = MITTE;
    data.pitch = MITTE;
-   data.yaw = MITTE+30;
+   data.yaw = MITTE+10;
    data.aux1 = 0;                                              
    data.aux2 = 0;
    resetcounter++;                                               
@@ -212,7 +189,6 @@ uint8_t initradio(void)
    
    // ********************
    // ACK Payload ********
-   //radio.enableDynamicPayloads();
    radio.enableAckPayload();
    // ********************
    
@@ -291,7 +267,6 @@ void setup()
          
       }break;
    }
-   
    LCD_DDR |= (1<<LCD_RSDS_PIN);
    LCD_DDR |= (1<<LCD_ENABLE_PIN);
    LCD_DDR |= (1<<LCD_CLOCK_PIN);
@@ -303,15 +278,19 @@ void setup()
    lcd_clr_line(0);
    
    DDRB |= (1<<PB0); // LED
-   DDRC &= ~(1<<PC3); // Batt
+   //pinMode(LOOPLED,OUTPUT);
+   DDRC &= ~(1<<BATT_PIN); // Batt
    DDRC |= (1<<PC5); // Buzzer // SCL
    
    DDRC |= (1<<PC0);
    DDRC |= (1<<PC1);
    DDRC |= (1<<PC2);
    
-   DDRD |= (1<<PD3); // OSZIA
-   PORTD |= (1<<PD3); // OSZIA
+   DDRD |= (1<<OSZIA_PIN); // OSZIA
+   PORTD |= (1<<OSZIA_PIN); // OSZIA
+
+   DDRD &= ~(1<<TEST_PIN); // TEST  INPUT
+   PORTD |= (1<<TEST_PIN); // TEST  PULLUP
    
    // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
    ch1.attach(S0); // YAW
@@ -422,7 +401,7 @@ void loop()
    
    if(loopcounter >= BLINKRATE)
    {
-      if(TEST)
+      if(!(PIND & (1<<TEST_PIN)))
       {
          //uint16_t diff = altitude - startaltitude +1;
         
@@ -485,7 +464,7 @@ void loop()
      // lcd_putc(' ');
      // lcd_putint(ackData[3]);
 
-      PORTB ^= (1<<0);
+      PORTB ^= (1<<0); // LOOPLED
       
       loopcounter = 0;
       impulscounter++;
@@ -493,7 +472,7 @@ void loop()
       //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
       //digitalWrite(A0, ! digitalRead(A0))
       //Serial.println(data.yaw);
-      if(TEST)
+      if(!(PIND & (1<<TEST_PIN)))
       {
        
          //lcd_gotoxy(4,0);
