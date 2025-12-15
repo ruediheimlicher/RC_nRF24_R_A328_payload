@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <SPI.h>
-//#include <nRF24L01.h>
 #include <RF24.h>
 #include <Servo.h>
 
@@ -9,14 +8,14 @@
 
 #include "defines.h"
 
+#include "MS5611.h"
+
 /*
  RC_nRF_Receiver A328 payload
  
  PCB: RC_nRF24_A8_1
  
  */
-
-#include "MS5611.h"
 
 uint16_t loopcounter = 0;
 
@@ -26,7 +25,7 @@ uint16_t radiocounter = 1;
 
 uint8_t radiostatus = 0;
 
-// MS5611
+// ms5611
 float temperature = 0;
 float temperaturmittel = 0;
  uint16_t temperature_int = 0;
@@ -40,15 +39,11 @@ uint16_t pressureint = 0;
 
 float altitude = 0;
 float startaltitude = 0;
-float altitudemittel = 0;
 
-uint16_t altitudeint = 0;
-uint32_t oldpressuremittel = 0;
+
 uint16_t aktpressure = 0;
-volatile uint16_t aktaltitude = 0;
+uint16_t pressuredelaycounter = 0;
 float startpressure = 0;
-uint16_t startpressureint = 0;
-const float mittelfaktor = 0.1;
 
 
 //
@@ -61,12 +56,9 @@ uint8_t ackData[4] = {31,32,33,34};
 // ********************
 // ********************
 
-uint16_t pressurearray[16] = {0};
-uint16_t altarray[16] = {0};
-uint8_t pressurecounter = 0;
-uint16_t pressuredelaycounter = 0;
 
-#
+
+
 uint16_t firsttimecounter = 0;
 
 
@@ -98,9 +90,6 @@ struct Signal
 };
 
 Signal data;
-
-
-
 
 
 
@@ -149,10 +138,7 @@ const uint64_t pipeIn = 0xABCDABCD71LL;
 // instantiate an object for the nRF24L01 transceiver
 RF24 radio(CE_PIN, CSN_PIN);
 
-
-MS5611 MS5611(0x77);
-
-
+MS5611 ms5611(0x77);
 
 void ResetData()
 {
@@ -215,18 +201,15 @@ uint8_t initradio(void)
 }
 
 
-
-float temperatur = 0;
-
 void readStartpressure()
 {
-  startpressure = MS5611.getPressure();
+  startpressure = ms5611.getPressure();
 }
 
 uint16_t readSensor()
 {
-   MS5611.read();    
-   temperature = MS5611.getTemperature();
+   ms5611.read();    
+   temperature = ms5611.getTemperature();
    
     if(temperature == 0)
     {
@@ -237,7 +220,7 @@ uint16_t readSensor()
       temperaturmittel = temperaturmittel + faktor * (temperature - temperaturmittel);
     }
    
-   pressure = MS5611.getPressure() * 10; // 
+   pressure = ms5611.getPressure() * 10; // 
    
    // Filter
     if (pressuremittel == 0)
@@ -280,6 +263,7 @@ void setup()
    LOOPLED_DDR |= (1<<LOOPLED);
 
    BATT_DDR &= ~(1<<BATT_PIN); // Batt
+   
    BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer 
    
 
@@ -309,21 +293,21 @@ void setup()
    initADC();
    
    Wire.begin();
-   if (MS5611.begin() == true)
+   if (ms5611.begin() == true)
    {
       lcd_gotoxy(0,3);
-      lcd_puts("MS5611 found: ");
-      lcd_putint12(MS5611.getAddress());
+      lcd_puts("ms5611 found: ");
+      lcd_putint12(ms5611.getAddress());
    }
    else
    {
       lcd_gotoxy(0,3);
-      lcd_puts("MS5611 not found: ");
+      lcd_puts("ms5611 not found: ");
    }
    
-   MS5611.reset(0);
+   ms5611.reset(0);
    
-   MS5611.setOversampling(OSR_HIGH);
+   ms5611.setOversampling(OSR_STANDARD);
 
 
    
@@ -331,22 +315,6 @@ void setup()
    lcd_clr_line(3);
 
  
-   for(uint8_t i=0;i<10;i++)
-   {
-      float temp = MS5611.getPressure();
-      if(startpressure != 0)
-      {
-           startpressure = startpressure + mittelfaktor * (temp - startpressure);
-      }
-      else
-      {
-          startpressure = temp;
-      }
-      
-   } // for
-   //startaltitude = MS5611.getAltitude(seaLevelPressure);
-    
-
    
 }
 unsigned long lastRecvTime = 0;
@@ -380,7 +348,7 @@ void loop()
       OSZIALO;
       float pressurenew = readSensor(); // temperaturmittel, pressuremittel*10
       OSZIAHI;
-      temperature_int = uint8_t(temperaturmittel * 5); // 3 Stellen <255
+      temperature_int = uint8_t(temperaturmittel *5); // 3 Stellen <255
       ackData[0] = temperature_int;
 
       pressureint = (pressuremittel); // 
@@ -388,9 +356,6 @@ void loop()
       ackData[2] = (pressureint & 0x00FF);
 
 
-
-      //ackData[2] = aktpressure & 0x8F;
-      //ackData[1] = (altitudeint-100) & 0xFF ;
    }
    
    loopcounter++;
@@ -406,9 +371,9 @@ void loop()
          lcd_putint(ackData[1]);
          lcd_gotoxy(4,0);
          lcd_putint(ackData[2]);
-         uint16_t pressureint2 = (ackData[1] <<8) | ackData[2];
-         lcd_gotoxy(8,0);
-         lcd_putint16(pressureint2);
+         //uint16_t pressureint2 = (ackData[1] <<8) | ackData[2];
+         //lcd_gotoxy(8,0);
+         //lcd_putint16(pressureint2);
 
          lcd_gotoxy(0,2);
          lcd_putint12(temperature);
@@ -460,20 +425,18 @@ void loop()
     */
       batt = constrain(batt, 600, 1000);
       {
-          ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
+      ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
       }
      
      // lcd_putc(' ');
      // lcd_putint(ackData[3]);
 
-      PORTB ^= (1<<0); // LOOPLED
+      LOOPLED_PORT ^= (1<<LOOPLED); // LOOPLED
       
       loopcounter = 0;
       impulscounter++;
       
-      //digitalWrite(LOOPLED, ! digitalRead(LOOPLED));
-      //digitalWrite(A0, ! digitalRead(A0))
-      //Serial.println(data.yaw);
+
       if(!(PIND & (1<<TEST_PIN)))
       {
        
@@ -500,7 +463,6 @@ void loop()
          
       } // if TEST
          
-      
       
    }
    
