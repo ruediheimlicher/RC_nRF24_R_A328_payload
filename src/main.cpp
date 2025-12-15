@@ -418,15 +418,15 @@ void loop()
      // lcd_gotoxy(0,0);
      // lcd_putint12(batt);
 
-     /*
-    map() begrenzt nicht.
-    Werte unter in_min → Ergebnis unter out_min.
-    Speicherung in byte → Unterlauf → scheinbar 0–255.
-    */
+      /*
+      map() begrenzt nicht.
+      Werte unter in_min → Ergebnis unter out_min.
+      Speicherung in byte → Unterlauf → scheinbar 0–255.
+      */
       batt = constrain(batt, 600, 1000);
-      {
+      
       ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
-      }
+      
      
      // lcd_putc(' ');
      // lcd_putint(ackData[3]);
@@ -473,21 +473,14 @@ void loop()
     }
     else if  (firsttimecounter ==  FIRSTTIMEDELAY )
     {
-    if(initradio())
-    {
-    radiostatus |= (1<<RADIOSTARTED);
-    }
+    
     
     }
     */
    
    if( radiostatus & (1<<RADIOSTARTED))
    {
-      
-      
-      //ackData[0] = data.yaw;
-      //ackData[1] = data.pitch;
-      
+          
       recvData();
       unsigned long now = millis();
       if ( now - lastRecvTime > 1000 ) 
@@ -510,9 +503,8 @@ void loop()
    // ON/OFF
    ch_width_5 = map(data.aux1, 0, 1, 1000, 2000); 
    //ch_width_6 = map(data.aux2, 0, 1, 1000, 2000); 
-   //ch_width_6 = map((impulscounter & 0xFF ), 0, 255, 1000, 2000);
    
-   //ch_width_1 = 100;
+  
    
    ch1.writeMicroseconds(ch_width_1);           // Write the PWM signal
    ch2.writeMicroseconds(ch_width_2);
