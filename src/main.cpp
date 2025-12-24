@@ -52,7 +52,7 @@ float startpressure = 0;
 // ********************
 // ACK Payload ********
 bool newData = false;
-uint8_t ackData[4] = {31,32,33,34};
+uint8_t ackData[4] = {0,0,0,0};
 // ********************
 // ********************
 
@@ -208,7 +208,8 @@ void readStartpressure()
 
 uint16_t readSensor()
 {
-   ms5611.read();    
+   ms5611.read();   
+   cli();
    temperature = ms5611.getTemperature();
    
     if(temperature == 0)
@@ -231,7 +232,7 @@ uint16_t readSensor()
     {
       pressuremittel = pressuremittel + faktor * ( pressure - pressuremittel);
     }
-
+   sei();
    return pressuremittel ;
 }
 
@@ -247,32 +248,34 @@ void setup()
       }break;
       case R_DIL:
       {
+         LCD_DDR |= (1<<LCD_RSDS_PIN);
+         LCD_DDR |= (1<<LCD_ENABLE_PIN);
+         LCD_DDR |= (1<<LCD_CLOCK_PIN);
+         
+         TEST_DDR &= ~(1<<TEST_PIN); // TEST  INPUT
+         TEST_PORT |= (1<<TEST_PIN); // TEST  PULLUP
+   
+         lcd_initialize(LCD_FUNCTION_8x2, LCD_CMD_ENTRY_INC, LCD_CMD_ON);
+         delay(5);
+         lcd_puts("Guten Tag\0");
+         delay(1000);
+         lcd_clr_line(0);
          
       }break;
    }
-   LCD_DDR |= (1<<LCD_RSDS_PIN);
-   LCD_DDR |= (1<<LCD_ENABLE_PIN);
-   LCD_DDR |= (1<<LCD_CLOCK_PIN);
-   
-   lcd_initialize(LCD_FUNCTION_8x2, LCD_CMD_ENTRY_INC, LCD_CMD_ON);
-   delay(5);
-   lcd_puts("Guten Tag\0");
-   delay(1000);
-   lcd_clr_line(0);
    
    LOOPLED_DDR |= (1<<LOOPLED);
 
    BATT_DDR &= ~(1<<BATT_PIN); // Batt
    
-   BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer 
+   //BUZZER_DDR |= (1<<BUZZER_PIN); // Buzzer 
    
-
    OSZIA_DDR |= (1<<OSZIA_PIN); // OSZIA
    OSZIA_PORT |= (1<<OSZIA_PIN); // OSZIA
 
-   TEST_DDR &= ~(1<<TEST_PIN); // TEST  INPUT
-   TEST_PORT |= (1<<TEST_PIN); // TEST  PULLUP
-   
+   OSZIA_DDR |= (1<<OSZIB_PIN); // OSZIB
+   OSZIA_PORT |= (1<<OSZIB_PIN); // OSZIB
+ 
    // Set the pins for each PWM signal | Her bir PWM sinyal için pinler belirleniyor.
    ch1.attach(S0); // YAW
    ch2.attach(S1); // PITCH
@@ -295,28 +298,32 @@ void setup()
    Wire.begin();
    if (ms5611.begin() == true)
    {
-      lcd_gotoxy(0,3);
-      lcd_puts("ms5611 found: ");
-      lcd_putint12(ms5611.getAddress());
+      if(BOARD == R_DIL)
+      {
+         lcd_gotoxy(0,3);
+         lcd_puts("ms5611 found: ");
+         lcd_putint12(ms5611.getAddress());
+      }
+      
    }
    else
    {
+      if(BOARD == R_DIL)
+      {
       lcd_gotoxy(0,3);
       lcd_puts("ms5611 not found: ");
+      }
    }
    
    ms5611.reset(0);
    
    ms5611.setOversampling(OSR_STANDARD);
 
-
-   
    _delay_ms(1000);
    lcd_clr_line(3);
 
- 
-   
 }
+
 unsigned long lastRecvTime = 0;
 
 void recvData()
@@ -324,14 +331,33 @@ void recvData()
    if ( radio.available() ) 
    {
       radiocounter++;
+      OSZIBLO;
       radio.read(&data, sizeof(Signal));
       lastRecvTime = millis();   // Receive the data | Data alınıyor
       
       // ********************
       // ACK Payload ********
+      // ********************
+
       radio.writeAckPayload(1, &ackData, sizeof(ackData));
-      // ********************
-      // ********************
+
+      if(radiocounter % 4 == 0)
+      {
+         OSZIALO;
+         float pressurenew = readSensor(); // temperaturmittel, pressuremittel*10
+         OSZIAHI;
+         temperature_int = uint8_t(temperaturmittel *5); // 3 Stellen <255
+         ackData[0] = temperature_int;
+
+         pressureint = (pressuremittel); // 
+         ackData[1] = (pressureint & 0xFF00)>>8;
+         ackData[2] = (pressureint & 0x00FF);
+      }
+
+
+
+      OSZIBHI;
+      
    }
 }
 
@@ -345,16 +371,17 @@ void loop()
    if(pressuredelaycounter > 0xFF)
    {
       pressuredelaycounter = 0;
-      OSZIALO;
+      //OSZIALO;
+      /*
       float pressurenew = readSensor(); // temperaturmittel, pressuremittel*10
-      OSZIAHI;
+      //OSZIAHI;
       temperature_int = uint8_t(temperaturmittel *5); // 3 Stellen <255
       ackData[0] = temperature_int;
 
       pressureint = (pressuremittel); // 
       ackData[1] = (pressureint & 0xFF00)>>8;
       ackData[2] = (pressureint & 0x00FF);
-
+   */
 
    }
    
@@ -362,7 +389,8 @@ void loop()
    
    if(loopcounter >= BLINKRATE)
    {
-      if(!(PIND & (1<<TEST_PIN)))
+     
+      if ((BOARD == R_DIL) && (!(PIND & (1<<TEST_PIN))))
       {
          
          //uint16_t diff = altitude - startaltitude +1;
@@ -425,7 +453,7 @@ void loop()
       */
       batt = constrain(batt, 600, 1000);
       
-      ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
+      //ackData[3] = map(batt,600,1000,0,255); // BATT 8.4V: 240   6.4V: 94   6.0: 65
       
      
      // lcd_putc(' ');
@@ -437,11 +465,11 @@ void loop()
       impulscounter++;
       
 
-      if(!(PIND & (1<<TEST_PIN)))
+      if ((BOARD == R_DIL) && (!(PIND & (1<<TEST_PIN))))
       {
        
-         //lcd_gotoxy(4,0);
-         //lcd_putint12(resetcounter);
+         lcd_gotoxy(10,0);
+         lcd_putint12(resetcounter);
          
          lcd_gotoxy(16,0);
          lcd_putint12(radiocounter);
@@ -452,14 +480,30 @@ void loop()
          lcd_putc(' ');
          //lcd_putint12(ch_width_1);
          //lcd_putc(' ');
-         lcd_putint(data.pitch);
+         //lcd_putint(data.pitch);
          //lcd_putc(' ');
          //lcd_putint12(ch_width_2);
          
+         lcd_gotoxy(4,1);
+         lcd_putint(ackData[0]);// alt
+         lcd_gotoxy(8,1);
+         lcd_putint(ackData[1]);// alt
          lcd_gotoxy(12,1);
          lcd_putint(ackData[2]);// alt
          lcd_gotoxy(16,1);
          lcd_putint(ackData[3]); // Batt
+
+         lcd_gotoxy(6,3);
+         uint16_t intpart = (int)pressuremittel;
+         uint16_t fraqpart = (pressuremittel - (float)intpart) * 1000;
+         lcd_putint16(intpart);
+         lcd_putc(' ');
+         lcd_putint12(fraqpart);
+         /*
+         int whole = (int)x;
+         int frac = (x - (float)whole); // this gives 0.345 - expected
+         */
+
          
       } // if TEST
          
@@ -485,8 +529,10 @@ void loop()
       unsigned long now = millis();
       if ( now - lastRecvTime > 1000 ) 
       {
+         
          ResetData();  // Signal lost.. Reset data
       }
+
    } 
    
    //data.yaw = (impulscounter & 0xFF );//& 0xFF00) >> 8;
